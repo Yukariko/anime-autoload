@@ -1,0 +1,6 @@
+[package]
+name = "anime-autoload"
+version = "0.1.0"
+authors = ["yukariko <rkdals7979@naver.com>"]
+
+[dependencies]
