@@ -1,3 +1,15 @@
+//#![deny(warnings)]
+extern crate futures;
+extern crate hyper;
+extern crate tokio_core;
+extern crate serde_json;
+
+use std::io::{self, Write};
+use futures::{Future, Stream};
+use tokio_core::reactor::Core;
+use hyper::{Body, Client, Request};
+use serde_json::Value;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
@@ -33,10 +45,54 @@ fn get_anime_list(file_path : &str) -> Vec<String> {
     list
 }
 
+fn get_json_from_uri(uri : hyper::Uri)
+{
+    let mut core = Core::new().unwrap();
+    let client = Client::new(&core.handle());
+    let _work = client.get(uri).and_then(|res| {
+        //println!("Response: {}", res.status());
+
+        /*res.body().for_each(|chunk| {
+            io::stdout()
+                .write_all(&chunk)
+                .map_err(From::from)
+        })*/
+
+        res.body().concat2().and_then(move |body| {
+        let v: Value = serde_json::from_slice(&body).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                e
+            )
+        })?;
+
+        let mut i = 0;
+        while v[i] != serde_json::Value::Null {
+            println!("{}:{}", v[i]["i"], v[i]["s"]);
+            i += 1;
+        }
+        Ok(())
+    })
+
+    });
+    core.run(_work);
+}
+
+fn get_anime_url_list()
+{
+    let url = String::from("http://www.anissia.net/anitime/list?w=");
+    for i in 0..7 {
+        let uri = url.clone() + format!("{}", i).as_str();
+        get_json_from_uri(uri.parse::<hyper::Uri>().unwrap());
+    }
+}
+
 fn main() {
     let list = get_anime_list("anime_list.conf");
 
     for item in list {
         print!("{}\n", item);
     }
+
+    get_anime_url_list();
 }
