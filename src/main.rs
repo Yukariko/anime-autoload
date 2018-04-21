@@ -3,19 +3,25 @@ extern crate futures;
 extern crate hyper;
 extern crate tokio_core;
 extern crate serde_json;
-
+extern crate hyper_openssl;
 
 use futures::{Future, Stream};
 use tokio_core::reactor::*;
-use hyper::Client ;
+use hyper::Client;
+use hyper::client::HttpConnector;
+use hyper_openssl::HttpsConnector;
 use serde_json::Value;
-
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
-fn get_anime_list(file_path : &str) -> Vec<String> {
+struct AnimeConf {
+    name : String,
+    magnet : String,
+}
+
+fn get_anime_list(file_path : &str) -> Vec<AnimeConf> {
     let path = Path::new(file_path);
     let display = path.display();
     let mut file = match File::open(&path) {
@@ -23,7 +29,7 @@ fn get_anime_list(file_path : &str) -> Vec<String> {
         Ok(file) => file,
     };
 
-    let mut list : Vec<String> = Vec::new();
+    let mut list : Vec<AnimeConf> = Vec::new();
     let mut s =  String::new();
     match file.read_to_string(&mut s) {
         Err(why) => panic!("couldn't read {}: {}", display, why.description()),
@@ -34,7 +40,10 @@ fn get_anime_list(file_path : &str) -> Vec<String> {
     loop {
         match lines.next() {
             Some(x) => {
-                list.push(x.to_string());
+                list.push(AnimeConf {
+                    name : x.to_string(),
+                    magnet : String::new(),
+                });
             },
             None => { break }
         }
@@ -53,6 +62,16 @@ fn get_body(uri : String) -> String {
         })
     });
     core.run(f).unwrap()
+}
+
+fn get_body_ssl(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, uri : String) -> String {
+    let f = client.get(uri.parse().unwrap()).map_err(|_err| ()).and_then(|resp| {
+	    resp.body().concat2().map_err(|_err| ()).map(|chunk| {
+	        let v = chunk.to_vec();
+	        String::from_utf8_lossy(&v).to_string()
+	    })
+	});
+	core.run(f).unwrap()
 }
 
 struct Anime {
@@ -84,10 +103,18 @@ fn convert_series_to_float(series : &str) -> f64 {
     series.to_string().parse::<f64>().unwrap() / 10.0
 }
 
-fn get_anime_subtitles_uri(id : i64) {
+fn get_anime_magnet(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, magnet : &str) {
+    let url = String::from("https://nyaa.si/?f=0&c=0_0&q=ohys");
+    let uri = url + magnet;
+    let res = get_body_ssl(&mut *core, &client, uri);
+
+    //println!("{}", res);
+}
+
+fn get_anime_subtitles_uri(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, id : i64) {
     let url = String::from("http://www.anissia.net/anitime/cap?i=");
     let uri = url + id.to_string().as_str();
-    let res : Value = serde_json::from_str(get_body(uri).as_str()).unwrap();
+    let res : Value = serde_json::from_str(get_body_ssl(&mut *core, &client, uri).as_str()).unwrap();
     {
         let mut i = 0;
         let mut max_series = 0.5;
@@ -114,11 +141,17 @@ fn main() {
         <title>Anime Autoload System</title>
     </head>
     <body>");
+
+    let mut core = Core::new().unwrap();
+	let client = Client::configure()
+    	.connector(HttpsConnector::new(4, &core.handle()).unwrap())
+	    .build(&core.handle());
     for item in &id_list {
         for item2 in &list {
-            if &item.name == item2 {
+            if item.name == item2.name {
                 println!("<h3>{}</h3>\n<ul>", item.name);
-                get_anime_subtitles_uri(item.id);
+                get_anime_magnet(&mut core, &client, &item2.magnet);
+                get_anime_subtitles_uri(&mut core, &client, item.id);
                 println!("</ul>");
                 break;
             }
