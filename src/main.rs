@@ -87,7 +87,7 @@ fn get_anime_subtitles_uri(id : i64) {
     {
         let mut i = 0;
         while res[i] != Value::Null {
-            println!("<a href={}>[{}] {}</a>", res[i]["a"], res[i]["s"], res[i]["n"]);
+            println!("<li><a href={}>[{}] {}</a></li>", res[i]["a"], res[i]["s"], res[i]["n"]);
             i += 1;
         }
     }
@@ -105,8 +105,9 @@ fn main() {
     for item in &id_list {
         for item2 in &list {
             if &item.name == item2 {
-                println!("<h>{}</h>", item.name);
+                println!("<h3>{}</h3>\n<ul>", item.name);
                 get_anime_subtitles_uri(item.id);
+                println!("</ul>");
                 break;
             }
         }
