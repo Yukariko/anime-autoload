@@ -90,12 +90,16 @@ fn get_anime_subtitles_uri(id : i64) {
     let res : Value = serde_json::from_str(get_body(uri).as_str()).unwrap();
     {
         let mut i = 0;
+        let mut max_series = 0.5;
         while res[i] != Value::Null {
             let series = convert_series_to_float(res[i]["s"].as_str().unwrap());
             let link = &res[i]["a"];
             let name = res[i]["n"].as_str().unwrap();
             let date = &res[i]["d"].as_str().unwrap();
-            println!("<li><a href={}>[{}화] {} - {}</a></li>", link, series, name, date);
+            if max_series <= series {
+                println!("<li><a href={}>[{}화] {} - {}</a></li>", link, series, name, date);
+                max_series = series;
+            }
             i += 1;
         }
     }
