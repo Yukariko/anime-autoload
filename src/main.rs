@@ -2,7 +2,6 @@
 extern crate futures;
 extern crate hyper;
 extern crate tokio_core;
-#[macro_use]
 extern crate serde_json;
 
 
@@ -28,9 +27,7 @@ fn get_anime_list(file_path : &str) -> Vec<String> {
     let mut s =  String::new();
     match file.read_to_string(&mut s) {
         Err(why) => panic!("couldn't read {}: {}", display, why.description()),
-        Ok(_) => {
-            print!("{} contains:\n{}", display, s);
-        },
+        Ok(_) => {},
     }
 
     let mut lines = s.lines();
@@ -83,16 +80,29 @@ fn get_anime_id_list() -> Vec<Anime> {
     list
 }
 
+fn get_anime_subtitles_uri(id : i64) {
+    let url = String::from("http://www.anissia.net/anitime/cap?i=");
+    let uri = url + id.to_string().as_str();
+    let res : Value = serde_json::from_str(get_body(uri).as_str()).unwrap();
+    {
+        let mut i = 0;
+        while res[i] != Value::Null {
+            println!("{}: {} - {}", res[i]["s"], res[i]["a"], res[i]["n"]);
+            i += 1;
+        }
+    }
+}
+
 fn main() {
     let list = get_anime_list("anime_list.conf");
-
-    for item in &list {
-        print!("{}\n", item);
-    }
-
     let id_list = get_anime_id_list();
     for item in &id_list {
-        println!("{}: {}", item.id, item.name);
+        for item2 in &list {
+            if &item.name == item2 {
+                println!("[{}]", item.name);
+                get_anime_subtitles_uri(item.id);
+                break;
+            }
+        }
     }
-
 }
