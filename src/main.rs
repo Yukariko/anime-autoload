@@ -80,6 +80,10 @@ fn get_anime_id_list() -> Vec<Anime> {
     list
 }
 
+fn convert_series_to_float(series : &str) -> f64 {
+    series.to_string().parse::<f64>().unwrap() / 10.0
+}
+
 fn get_anime_subtitles_uri(id : i64) {
     let url = String::from("http://www.anissia.net/anitime/cap?i=");
     let uri = url + id.to_string().as_str();
@@ -87,7 +91,11 @@ fn get_anime_subtitles_uri(id : i64) {
     {
         let mut i = 0;
         while res[i] != Value::Null {
-            println!("<li><a href={}>[{}] {}</a></li>", res[i]["a"], res[i]["s"], res[i]["n"]);
+            let series = convert_series_to_float(res[i]["s"].as_str().unwrap());
+            let link = &res[i]["a"];
+            let name = res[i]["n"].as_str().unwrap();
+            let date = &res[i]["d"].as_str().unwrap();
+            println!("<li><a href={}>[{}화] {} - {}</a></li>", link, series, name, date);
             i += 1;
         }
     }
