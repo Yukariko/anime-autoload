@@ -87,7 +87,7 @@ fn get_anime_subtitles_uri(id : i64) {
     {
         let mut i = 0;
         while res[i] != Value::Null {
-            println!("{}: {} - {}", res[i]["s"], res[i]["a"], res[i]["n"]);
+            println!("<a href={}>[{}] {}</a>", res[i]["a"], res[i]["s"], res[i]["n"]);
             i += 1;
         }
     }
@@ -96,13 +96,21 @@ fn get_anime_subtitles_uri(id : i64) {
 fn main() {
     let list = get_anime_list("anime_list.conf");
     let id_list = get_anime_id_list();
+
+    println!("<html>
+    <head>
+        <title>Anime Autoload System</title>
+    </head>
+    <body>");
     for item in &id_list {
         for item2 in &list {
             if &item.name == item2 {
-                println!("[{}]", item.name);
+                println!("<h>{}</h>", item.name);
                 get_anime_subtitles_uri(item.id);
                 break;
             }
         }
     }
+    println!("    </body>
+</html>");
 }
