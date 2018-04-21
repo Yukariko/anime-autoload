@@ -2,12 +2,13 @@
 extern crate futures;
 extern crate hyper;
 extern crate tokio_core;
+#[macro_use]
 extern crate serde_json;
 
-use std::io::{self, Write};
+
 use futures::{Future, Stream};
-use tokio_core::reactor::Core;
-use hyper::{Body, Client, Request};
+use tokio_core::reactor::*;
+use hyper::Client ;
 use serde_json::Value;
 
 use std::error::Error;
@@ -45,54 +46,53 @@ fn get_anime_list(file_path : &str) -> Vec<String> {
     list
 }
 
-fn get_json_from_uri(uri : hyper::Uri)
-{
+fn get_body(uri : String) -> String {
     let mut core = Core::new().unwrap();
     let client = Client::new(&core.handle());
-    let _work = client.get(uri).and_then(|res| {
-        //println!("Response: {}", res.status());
-
-        /*res.body().for_each(|chunk| {
-            io::stdout()
-                .write_all(&chunk)
-                .map_err(From::from)
-        })*/
-
-        res.body().concat2().and_then(move |body| {
-        let v: Value = serde_json::from_slice(&body).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                e
-            )
-        })?;
-
-        let mut i = 0;
-        while v[i] != serde_json::Value::Null {
-            println!("{}:{}", v[i]["i"], v[i]["s"]);
-            i += 1;
-        }
-        Ok(())
-    })
-
+    let f = client.get(uri.parse().unwrap()).map_err(|_err| ()).and_then(|resp| {
+        resp.body().concat2().map_err(|_err| ()).map(|chunk| {
+            let v = chunk.to_vec();
+            String::from_utf8_lossy(&v).to_string()
+        })
     });
-    core.run(_work);
+    core.run(f).unwrap()
 }
 
-fn get_anime_url_list()
-{
+struct Anime {
+    id : i64,
+    name : String,
+}
+
+fn get_anime_id_list() -> Vec<Anime> {
     let url = String::from("http://www.anissia.net/anitime/list?w=");
+    let mut list : Vec<Anime> = Vec::new();
     for i in 0..7 {
         let uri = url.clone() + format!("{}", i).as_str();
-        get_json_from_uri(uri.parse::<hyper::Uri>().unwrap());
+        let res : Value = serde_json::from_str(get_body(uri).as_str()).unwrap();
+        {
+            let mut j = 0;
+            while res[j] != Value::Null {
+                list.push(Anime {
+                    id : res[j]["i"].as_i64().unwrap(),
+                    name: res[j]["s"].as_str().unwrap().to_string(),
+                });
+                j += 1;
+            }
+        }
     }
+    list
 }
 
 fn main() {
     let list = get_anime_list("anime_list.conf");
 
-    for item in list {
+    for item in &list {
         print!("{}\n", item);
     }
 
-    get_anime_url_list();
+    let id_list = get_anime_id_list();
+    for item in &id_list {
+        println!("{}: {}", item.id, item.name);
+    }
+
 }
