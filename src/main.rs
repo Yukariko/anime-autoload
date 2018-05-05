@@ -40,9 +40,10 @@ fn get_anime_list(file_path : &str) -> Vec<AnimeConf> {
     loop {
         match lines.next() {
             Some(x) => {
+                let d : Vec<_> = x.split("\\").collect();
                 list.push(AnimeConf {
-                    name : x.to_string(),
-                    magnet : String::new(),
+                    name : d[0].to_string(),
+                    magnet : d[1].to_string(),
                 });
             },
             None => { break }
@@ -66,7 +67,7 @@ fn get_body(uri : String) -> String {
 
 fn get_body_ssl(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, uri : String) -> String {
     let f = client.get(uri.parse().unwrap()).map_err(|_err| ()).and_then(|resp| {
-	    resp.body().concat2().map_err(|_err| ()).map(|chunk| {
+        resp.body().concat2().map_err(|_err| ()).map(|chunk| {
 	        let v = chunk.to_vec();
 	        String::from_utf8_lossy(&v).to_string()
 	    })
@@ -103,12 +104,30 @@ fn convert_series_to_float(series : &str) -> f64 {
     series.to_string().parse::<f64>().unwrap() / 10.0
 }
 
-fn get_anime_magnet(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, magnet : &str) {
-    let url = String::from("https://nyaa.si/?f=0&c=0_0&q=ohys");
-    let uri = url + magnet;
-    let res = get_body_ssl(&mut *core, &client, uri);
-
-    //println!("{}", res);
+fn get_anime_magnet(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, anime_list : &mut Vec<AnimeConf>) {
+    let url = String::from("https://torrents.ohys.net/download/json.php?dir=new&p=");
+    for i in 0..4 {
+        let uri = format!("{}{}", url, i);
+        let buf = format!("{}", get_body_ssl(&mut *core, &client, uri).as_str());
+        let res : Value = serde_json::from_str(
+            buf.get(3..).unwrap()
+        ).unwrap();
+        {
+            let mut j = 0;
+            while res[j] != Value::Null {
+                let title = res[j]["t"].as_str().unwrap().to_string();
+                let magnet = res[j]["a"].as_str().unwrap().to_string();
+                for mut item in &mut *anime_list {
+                    if !title.starts_with(item.magnet.as_str()) {
+                        continue;
+                    }
+                    item.magnet = format!("<a href=\"https://torrents.ohys.net/download/{}\">{}</a>", magnet, title);
+                    break;
+                }
+                j += 1;
+            }
+        }
+    }
 }
 
 fn get_anime_subtitles_uri(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, id : i64) {
@@ -133,7 +152,7 @@ fn get_anime_subtitles_uri(core : &mut Core, client : &Client<HttpsConnector<Htt
 }
 
 fn main() {
-    let list = get_anime_list("anime_list.conf");
+    let mut list = get_anime_list("anime_list.conf");
     let id_list = get_anime_id_list();
 
     println!("<html>
@@ -146,11 +165,13 @@ fn main() {
 	let client = Client::configure()
     	.connector(HttpsConnector::new(4, &core.handle()).unwrap())
 	    .build(&core.handle());
+    get_anime_magnet(&mut core, &client, &mut list);
+
     for item in &id_list {
         for item2 in &list {
             if item.name == item2.name {
                 println!("<h3>{}</h3>\n<ul>", item.name);
-                get_anime_magnet(&mut core, &client, &item2.magnet);
+                println!("<li>{}</li>", item2.magnet);
                 get_anime_subtitles_uri(&mut core, &client, item.id);
                 println!("</ul>");
                 break;
