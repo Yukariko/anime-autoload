@@ -9,4 +9,3 @@ tokio-core      = "0.1"
 futures         = "0.1"
 serde_json      = "1.0"
 hyper-openssl   = "0.5.0"
-rss             = { version = "*", features = ["from_url"] }
