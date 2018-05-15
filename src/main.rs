@@ -8,7 +8,10 @@ extern crate hyper_openssl;
 use futures::{Future, Stream};
 use tokio_core::reactor::*;
 use hyper::Client;
+use hyper::Request;
+use hyper::Method;
 use hyper::client::HttpConnector;
+use hyper::header::Pragma;
 use hyper_openssl::HttpsConnector;
 use serde_json::Value;
 use std::error::Error;
@@ -41,6 +44,9 @@ fn get_anime_list(file_path : &str) -> Vec<AnimeConf> {
         match lines.next() {
             Some(x) => {
                 let d : Vec<_> = x.split("\\").collect();
+                if d[0].to_string().len() < 4 {
+            				continue;
+            		}
                 list.push(AnimeConf {
                     name : d[0].to_string(),
                     magnet : d[1].to_string(),
@@ -66,7 +72,13 @@ fn get_body(uri : String) -> String {
 }
 
 fn get_body_ssl(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, uri : String) -> String {
-    let f = client.get(uri.parse().unwrap()).map_err(|_err| ()).and_then(|resp| {
+    let mut request = Request::new(Method::Get, uri.parse().unwrap());
+    {
+    	let ref mut headers = request.headers_mut();
+			headers.set(Pragma::NoCache);
+		}
+
+    let f = client.request(request).map_err(|_err| ()).and_then(|resp| {
         resp.body().concat2().map_err(|_err| ()).map(|chunk| {
 	        let v = chunk.to_vec();
 	        String::from_utf8_lossy(&v).to_string()
@@ -105,6 +117,7 @@ fn convert_series_to_float(series : &str) -> f64 {
 }
 
 fn get_anime_magnet(core : &mut Core, client : &Client<HttpsConnector<HttpConnector>>, anime_list : &mut Vec<AnimeConf>) {
+
     let url = String::from("https://torrents.ohys.net/download/json.php?dir=new&p=");
     for i in 0..4 {
         let uri = format!("{}{}", url, i);
@@ -143,7 +156,7 @@ fn get_anime_subtitles_uri(core : &mut Core, client : &Client<HttpsConnector<Htt
             let name = res[i]["n"].as_str().unwrap();
             let date = &res[i]["d"].as_str().unwrap();
             if max_series <= series {
-                println!("<li><a href={}>[{}화] {} - {}</a></li>", link, series, name, date);
+                println!("<li><a target=\"_blank\" href={}>[{}화] {} - {}</a></li>", link, series, name, date);
                 max_series = series;
             }
             i += 1;
@@ -163,6 +176,7 @@ fn main() {
 
     let mut core = Core::new().unwrap();
 	let client = Client::configure()
+			.keep_alive(true)
     	.connector(HttpsConnector::new(4, &core.handle()).unwrap())
 	    .build(&core.handle());
     get_anime_magnet(&mut core, &client, &mut list);
