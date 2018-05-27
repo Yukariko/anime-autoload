@@ -171,12 +171,13 @@ fn main() {
     println!("<html>
     <head>
         <title>Anime Autoload System</title>
+        <meta charset="utf-8">
     </head>
     <body>");
 
     let mut core = Core::new().unwrap();
 	let client = Client::configure()
-			.keep_alive(true)
+			.keep_alive(false)
     	.connector(HttpsConnector::new(4, &core.handle()).unwrap())
 	    .build(&core.handle());
     get_anime_magnet(&mut core, &client, &mut list);
