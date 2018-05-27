@@ -171,7 +171,7 @@ fn main() {
     println!("<html>
     <head>
         <title>Anime Autoload System</title>
-        <meta charset="utf-8">
+        <meta charset=\"utf-8\">
     </head>
     <body>");
 
